@@ -10,6 +10,17 @@
     --text:#f2f3f5; --sub:#9aa1ad; --accent:#4fd1a5; --accent2:#3aa683;
     --danger:#e8695f; --blue:#6b9fff; --warn:#e8b84b;
   }
+  @media(prefers-color-scheme:light){
+    :root{
+      --bg:#f4f6f9; --card:#ffffff; --card2:#edf0f5; --border:#cdd2de;
+      --text:#111827; --sub:#6b7280; --accent:#2da87c; --accent2:#258a67;
+      --danger:#dc3545; --blue:#3b6fd4; --warn:#d97706;
+    }
+    header{box-shadow:0 1px 3px rgba(0,0,0,.07);}
+    .google-btn{box-shadow:0 1px 4px rgba(0,0,0,.12);border:1px solid #e5e7eb;}
+    .var-card.low .var-val{color:#dc3545;}
+    .var-card.high .var-val{color:#3b6fd4;}
+  }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:60px;}
 
@@ -391,26 +402,36 @@ window.runCalc = () => {
   }
 
   // ── Chart
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const C = {
+    contrib:  dark ? 'rgba(154,161,173,.55)' : 'rgba(107,114,128,.45)',
+    interest: dark ? 'rgba(79,209,165,.75)'  : 'rgba(45,168,124,.75)',
+    pessim:   dark ? 'rgba(232,105,95,.8)'   : 'rgba(185,40,40,.7)',
+    optim:    dark ? 'rgba(107,159,255,.8)'  : 'rgba(42,95,200,.7)',
+    tick:     dark ? '#9aa1ad'               : '#6b7280',
+    grid:     dark ? 'rgba(44,49,60,.6)'     : 'rgba(200,210,225,.6)',
+  };
+
   const labels   = base.map(r => 'Yr ' + r.year);
   const contribs = base.map(r => Math.max(0, r.contributions));
   const ints     = base.map(r => Math.max(0, r.interest));
 
   const datasets = [
-    { label: 'Contributions', data: contribs, backgroundColor: 'rgba(154,161,173,0.55)', stack: 's', order: 2 },
-    { label: 'Interest',      data: ints,     backgroundColor: 'rgba(79,209,165,0.75)',  stack: 's', order: 2 },
+    { label: 'Contributions', data: contribs, backgroundColor: C.contrib, stack: 's', order: 2 },
+    { label: 'Interest',      data: ints,     backgroundColor: C.interest, stack: 's', order: 2 },
   ];
 
   if (hasVar) {
     datasets.push({
       type: 'line', label: 'Pessimistic',
       data: low.map(r => r.balance),
-      borderColor: 'rgba(232,105,95,.8)', borderWidth: 1.5,
+      borderColor: C.pessim, borderWidth: 1.5,
       borderDash: [4,3], pointRadius: 0, fill: false, order: 1
     });
     datasets.push({
       type: 'line', label: 'Optimistic',
       data: high.map(r => r.balance),
-      borderColor: 'rgba(107,159,255,.8)', borderWidth: 1.5,
+      borderColor: C.optim, borderWidth: 1.5,
       borderDash: [4,3], pointRadius: 0, fill: false, order: 1
     });
   }
@@ -423,7 +444,7 @@ window.runCalc = () => {
       responsive: true, maintainAspectRatio: false,
       animation: { duration: 400 },
       plugins: {
-        legend: { labels: { color: '#9aa1ad', boxWidth: 12, font: { size: 11 } } },
+        legend: { labels: { color: C.tick, boxWidth: 12, font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: ctx => ' ' + ctx.dataset.label + ': ' + fmtK(ctx.raw)
@@ -433,16 +454,16 @@ window.runCalc = () => {
       scales: {
         x: {
           stacked: true,
-          ticks: { color: '#9aa1ad', font: { size: 10 },
+          ticks: { color: C.tick, font: { size: 10 },
             maxTicksLimit: Math.min(years, 10),
             maxRotation: 0
           },
-          grid: { color: 'rgba(44,49,60,.6)' }
+          grid: { color: C.grid }
         },
         y: {
           stacked: true,
-          ticks: { color: '#9aa1ad', font: { size: 10 }, callback: v => fmtK(v) },
-          grid: { color: 'rgba(44,49,60,.6)' }
+          ticks: { color: C.tick, font: { size: 10 }, callback: v => fmtK(v) },
+          grid: { color: C.grid }
         }
       }
     }
