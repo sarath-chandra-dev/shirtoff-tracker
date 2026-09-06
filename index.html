@@ -31,20 +31,25 @@
   .txt-btn{background:none;border:1px solid var(--border);color:var(--accent);font-size:11.5px;font-weight:600;padding:5px 10px;cursor:pointer;border-radius:8px;}
   .txt-btn.muted{color:var(--sub);border-color:transparent;}
 
-  main{padding:12px 12px 0;}
-  .day-header{display:flex;align-items:baseline;justify-content:space-between;margin:22px 4px 8px;}
-  .day-header:first-child{margin-top:8px;}
+  main{padding:6px 10px 0;}
+  .day-header{display:flex;align-items:center;justify-content:space-between;margin:8px 0 0;cursor:pointer;padding:7px 6px;border-radius:10px;user-select:none;-webkit-user-select:none;}
+  .day-header:active{background:var(--card2);}
+  .day-left{display:flex;align-items:center;gap:7px;}
+  .day-chevron{font-size:10px;color:var(--sub);transition:transform .18s;display:inline-block;transform:rotate(0deg);}
+  .day-chevron.open{transform:rotate(90deg);}
   .day-title{font-size:15px;font-weight:600;}
   .day-progress-text{font-size:11px;color:var(--sub);}
-  .progress-bar{height:5px;background:var(--card2);border-radius:4px;overflow:hidden;margin:0 4px 10px;}
+  .day-content{overflow:hidden;}
+  .day-content.collapsed{display:none;}
+  .progress-bar{height:4px;background:var(--card2);border-radius:4px;overflow:hidden;margin:4px 6px 8px;}
   .progress-fill{height:100%;background:var(--accent);width:0%;transition:width .2s;}
-  .block-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin:14px 4px 6px;}
-  .ex-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin-bottom:10px;}
+  .block-label{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin:8px 4px 4px;}
+  .ex-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 12px;margin-bottom:6px;}
   .ex-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-  .ex-name{font-size:15px;font-weight:600;line-height:1.3;}
-  .ex-meta{font-size:12px;color:var(--sub);white-space:nowrap;margin-top:2px;}
-  .cue{font-size:12.5px;color:var(--sub);margin-top:6px;line-height:1.45;}
-  .set-row{display:flex;align-items:center;gap:8px;margin-top:8px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:6px 8px;}
+  .ex-name{font-size:14px;font-weight:600;line-height:1.3;}
+  .ex-meta{font-size:12px;color:var(--sub);white-space:nowrap;margin-top:1px;}
+  .cue{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.4;}
+  .set-row{display:flex;align-items:center;gap:8px;margin-top:5px;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:5px 8px;}
   .set-row.done{background:rgba(79,209,165,0.15);border-color:var(--accent2);}
   .set-idx{font-size:11px;color:var(--sub);width:38px;flex-shrink:0;}
   .field{display:flex;flex-direction:column;flex:1;min-width:0;}
@@ -52,7 +57,7 @@
   .set-input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:2px 0;outline:none;}
   .set-input::placeholder{color:var(--sub);font-weight:400;}
   .set-check{font-size:18px;flex-shrink:0;width:26px;text-align:center;cursor:pointer;}
-  .footer-actions{display:flex;gap:8px;padding:16px 12px 4px;}
+  .footer-actions{display:flex;gap:8px;padding:12px 10px 4px;}
   .btn{flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;font-weight:600;text-align:center;cursor:pointer;}
   .btn.primary{background:var(--accent);color:#062018;border-color:var(--accent);}
   .btn.danger-outline{color:var(--danger);border-color:rgba(232,105,95,0.4);}
@@ -242,9 +247,10 @@ function bootApp() {
 
   // ── GLOBALS ────────────────────────────────────────────────────────────────
   let PROGRAM = [];
-  let state   = {};          // state[dayIdx]["exIdx-setIdx"] = {weight, height, done}
-  let currentUser = null;
-  let editorState = null;    // working copy used by the editor
+  let state        = {};       // state[dayIdx]["exIdx-setIdx"] = {weight, height, done}
+  let collapseState = {};      // collapseState[dayIdx] = true means collapsed
+  let currentUser  = null;
+  let editorState  = null;     // working copy used by the editor
 
   // ── UTILS ──────────────────────────────────────────────────────────────────
   const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -346,23 +352,40 @@ function bootApp() {
       new Date().toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
 
     PROGRAM.forEach((dayData, dayIdx) => {
+      // Initialise collapse state: collapsed by default on first render
+      if (collapseState[dayIdx] === undefined) collapseState[dayIdx] = true;
+      const isCollapsed = collapseState[dayIdx];
+
+      // ── Day header (clickable) ─────────────────────────────────────────────
       const dh = document.createElement('div');
       dh.className = 'day-header';
       dh.innerHTML =
-        `<div class="day-title">${esc(dayData.day)}: ${esc(dayData.title)}</div>` +
+        `<div class="day-left">` +
+        `<span class="day-chevron${isCollapsed ? '' : ' open'}" id="chv-${dayIdx}">▶</span>` +
+        `<div class="day-title">${esc(dayData.day)}: ${esc(dayData.title)}</div></div>` +
         `<div class="day-progress-text" id="pt-${dayIdx}"></div>`;
+      dh.onclick = () => {
+        collapseState[dayIdx] = !collapseState[dayIdx];
+        document.getElementById('dc-' + dayIdx).classList.toggle('collapsed', collapseState[dayIdx]);
+        document.getElementById('chv-' + dayIdx).classList.toggle('open', !collapseState[dayIdx]);
+      };
       main.appendChild(dh);
+
+      // ── Collapsible content wrapper ────────────────────────────────────────
+      const content = document.createElement('div');
+      content.className = 'day-content' + (isCollapsed ? ' collapsed' : '');
+      content.id = 'dc-' + dayIdx;
 
       const pb = document.createElement('div');
       pb.className = 'progress-bar';
       pb.innerHTML = `<div class="progress-fill" id="pf-${dayIdx}"></div>`;
-      main.appendChild(pb);
+      content.appendChild(pb);
 
       groupByBlock(dayData.exercises).forEach(group => {
         const lbl = document.createElement('div');
         lbl.className = 'block-label';
         lbl.textContent = group.label;
-        main.appendChild(lbl);
+        content.appendChild(lbl);
 
         group.items.forEach(({ ex, ei }) => {
           const card = document.createElement('div');
@@ -436,10 +459,11 @@ function bootApp() {
             row.appendChild(chk);
             card.appendChild(row);
           }
-          main.appendChild(card);
+          content.appendChild(card);
         });
       });
 
+      main.appendChild(content);
       updateProgressBar(dayIdx);
     });
 
