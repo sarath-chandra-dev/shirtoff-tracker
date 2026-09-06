@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Sarath Invests</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#1a1d24; --card2:#22262f; --border:#2c313c;
+    --text:#f2f3f5; --sub:#9aa1ad; --accent:#4fd1a5; --accent2:#3aa683;
+    --danger:#e8695f; --blue:#6b9fff; --warn:#e8b84b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding-bottom:60px;}
+
+  /* ── Auth ── */
+  #auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;text-align:center;}
+  .auth-logo{font-size:28px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+  .auth-sub{font-size:14px;color:var(--sub);margin-bottom:36px;line-height:1.5;}
+  .google-btn{display:flex;align-items:center;gap:10px;background:#fff;color:#1f2937;border:none;border-radius:12px;padding:13px 24px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35);}
+  .google-btn svg{width:18px;height:18px;flex-shrink:0;}
+  #auth-error{margin-top:16px;font-size:12px;color:var(--danger);max-width:300px;line-height:1.5;}
+
+  /* ── Shell ── */
+  #app-shell{display:none;}
+  header{position:sticky;top:0;background:var(--bg);z-index:10;padding:12px 16px 10px;border-bottom:1px solid var(--border);}
+  .hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+  h1{font-size:17px;margin:0;font-weight:700;}
+  .hdr-sub{font-size:12px;color:var(--sub);margin:0;}
+  .txt-btn{background:none;border:1px solid var(--border);color:var(--accent);font-size:11.5px;font-weight:600;padding:5px 10px;cursor:pointer;border-radius:8px;}
+  .txt-btn.muted{color:var(--sub);border-color:transparent;}
+  main{padding:12px;}
+
+  /* ── Card ── */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;}
+  .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--sub);margin:0 0 14px;}
+
+  /* ── Form ── */
+  .fg{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .ff{display:flex;flex-direction:column;gap:4px;}
+  .ff.full{grid-column:1/-1;}
+  .fl{font-size:10.5px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .fl span{font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;}
+  .fw{display:flex;align-items:center;background:var(--card2);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .15s;}
+  .fw:focus-within{border-color:var(--accent);}
+  .fp{font-size:13px;color:var(--sub);padding:0 6px 0 12px;font-weight:600;flex-shrink:0;}
+  .fs{font-size:13px;color:var(--sub);padding:0 12px 0 4px;font-weight:600;flex-shrink:0;}
+  .fi{flex:1;background:transparent;border:none;color:var(--text);font-size:14px;font-weight:600;padding:10px 6px;outline:none;min-width:0;width:100%;}
+  .fi::placeholder{color:var(--sub);font-weight:400;}
+  select.fi{cursor:pointer;appearance:none;-webkit-appearance:none;padding-left:12px;}
+  .fd{font-size:10.5px;color:var(--sub);line-height:1.4;margin-top:2px;}
+
+  /* ── Buttons ── */
+  .btn-row{display:flex;gap:8px;margin-top:14px;}
+  .btn{flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;font-weight:600;text-align:center;cursor:pointer;}
+  .btn.primary{background:var(--accent);color:#062018;border-color:var(--accent);}
+  .btn.outline-danger{color:var(--danger);border-color:rgba(232,105,95,.35);}
+
+  /* ── Results ── */
+  #results{display:none;}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+  .stat{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;}
+  .stat-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+  .stat-val{font-size:17px;font-weight:700;}
+  .stat-val.green{color:var(--accent);}
+  .stat-val.blue{color:var(--blue);}
+
+  /* Variance cards */
+  .var-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+  .var-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
+  .var-card.base{border-color:rgba(79,209,165,.5);}
+  .var-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}
+  .var-rate{font-size:11px;color:var(--sub);margin-bottom:5px;}
+  .var-val{font-size:15px;font-weight:700;}
+  .var-card.base .var-val{color:var(--accent);}
+  .var-card.low .var-val{color:var(--danger);}
+  .var-card.high .var-val{color:var(--blue);}
+
+  /* Chart */
+  .chart-wrap{position:relative;height:220px;margin-bottom:10px;}
+
+  /* Table toggle */
+  .tbl-toggle{font-size:12px;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:5px;margin-bottom:8px;user-select:none;}
+  .tbl-chv{font-size:10px;transition:transform .15s;}
+  .tbl-chv.open{transform:rotate(90deg);}
+  table.yr-tbl{width:100%;border-collapse:collapse;font-size:12px;display:none;}
+  table.yr-tbl.open{display:table;}
+  .yr-tbl th{text-align:left;color:var(--sub);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-bottom:1px solid var(--border);}
+  .yr-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);}
+  .yr-tbl tr:last-child td{border-bottom:none;}
+  .yr-tbl .r{text-align:right;font-variant-numeric:tabular-nums;}
+
+  /* ── Scenarios ── */
+  .sc-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .sc-item:last-child{border-bottom:none;}
+  .sc-info{flex:1;min-width:0;}
+  .sc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sc-meta{font-size:11px;color:var(--sub);}
+  .sc-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0;}
+  .sc-btn.load{color:var(--accent);border-color:rgba(79,209,165,.4);}
+  .sc-btn.del{color:var(--danger);border-color:rgba(232,105,95,.3);}
+  .empty{font-size:13px;color:var(--sub);text-align:center;padding:18px 0;}
+
+  /* ── Save modal ── */
+  #save-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:20px;}
+  #save-modal.open{display:flex;}
+  .modal-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;width:100%;max-width:340px;}
+  .modal-title{font-size:15px;font-weight:700;margin-bottom:14px;}
+
+  /* Toast */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--border);padding:8px 18px;border-radius:20px;font-size:12.5px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:500;white-space:nowrap;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- ── Auth ──────────────────────────────────────────────────────────────────-->
+<div id="auth-screen">
+  <div class="auth-logo">Sarath Invests</div>
+  <p class="auth-sub">Sign in to save and compare your investment scenarios.</p>
+  <button class="google-btn" onclick="signIn()">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+    Sign in with Google
+  </button>
+  <div id="auth-error"></div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────────────────────────-->
+<div id="app-shell">
+  <header>
+    <div class="hdr-top">
+      <h1>Sarath Invests</h1>
+      <button class="txt-btn muted" onclick="signOut()">Sign out</button>
+    </div>
+    <p class="hdr-sub" id="date-lbl"></p>
+  </header>
+
+  <main>
+    <!-- Calculator -->
+    <div class="card">
+      <div class="card-title">Compound Interest Calculator</div>
+      <div class="fg">
+        <div class="ff">
+          <div class="fl">Initial Investment</div>
+          <div class="fw"><span class="fp">$</span><input class="fi" id="f-principal" type="number" inputmode="decimal" placeholder="10,000" min="0"></div>
+        </div>
+        <div class="ff">
+          <div class="fl">Monthly Contribution</div>
+          <div class="fw"><span class="fp">$</span><input class="fi" id="f-monthly" type="number" inputmode="decimal" placeholder="500" min="0"></div>
+        </div>
+        <div class="ff">
+          <div class="fl">Length of Time</div>
+          <div class="fw"><input class="fi" id="f-years" type="number" inputmode="numeric" placeholder="30" min="1" max="100" style="padding-left:12px"><span class="fs">yrs</span></div>
+        </div>
+        <div class="ff">
+          <div class="fl">Annual Interest Rate</div>
+          <div class="fw"><input class="fi" id="f-rate" type="number" inputmode="decimal" placeholder="7" min="0" max="100" step="0.1" style="padding-left:12px"><span class="fs">%</span></div>
+        </div>
+        <div class="ff">
+          <div class="fl">Rate Variance <span>(optional)</span></div>
+          <div class="fw"><span class="fp">±</span><input class="fi" id="f-variance" type="number" inputmode="decimal" placeholder="2" min="0" max="50" step="0.1"><span class="fs">%</span></div>
+          <div class="fd">Shows pessimistic & optimistic scenarios</div>
+        </div>
+        <div class="ff">
+          <div class="fl">Compound Frequency</div>
+          <div class="fw">
+            <select class="fi" id="f-freq">
+              <option value="1">Annually</option>
+              <option value="2">Semi-annually</option>
+              <option value="4">Quarterly</option>
+              <option value="12" selected>Monthly</option>
+              <option value="365">Daily</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="runCalc()">Calculate</button>
+        <button class="btn" onclick="openSaveModal()">Save</button>
+        <button class="btn outline-danger" onclick="resetCalc()">Reset</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="card">
+        <div class="card-title">Results</div>
+
+        <!-- No variance -->
+        <div id="no-var-summary">
+          <div class="stat-grid">
+            <div class="stat"><div class="stat-lbl">Final Balance</div><div class="stat-val green" id="r-final">—</div></div>
+            <div class="stat"><div class="stat-lbl">Total Contributed</div><div class="stat-val" id="r-contrib">—</div></div>
+            <div class="stat"><div class="stat-lbl">Interest Earned</div><div class="stat-val blue" id="r-interest">—</div></div>
+          </div>
+        </div>
+
+        <!-- With variance -->
+        <div id="var-summary" style="display:none">
+          <div class="var-grid">
+            <div class="var-card low">
+              <div class="var-lbl">Pessimistic</div>
+              <div class="var-rate" id="v-rate-low">—</div>
+              <div class="var-val" id="v-final-low">—</div>
+            </div>
+            <div class="var-card base">
+              <div class="var-lbl">Base</div>
+              <div class="var-rate" id="v-rate-base">—</div>
+              <div class="var-val" id="v-final-base">—</div>
+            </div>
+            <div class="var-card high">
+              <div class="var-lbl">Optimistic</div>
+              <div class="var-rate" id="v-rate-high">—</div>
+              <div class="var-val" id="v-final-high">—</div>
+            </div>
+          </div>
+          <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+            <div class="stat"><div class="stat-lbl">Total Contributed</div><div class="stat-val" id="rv-contrib">—</div></div>
+            <div class="stat"><div class="stat-lbl">Interest (base)</div><div class="stat-val blue" id="rv-interest">—</div></div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="chart-wrap"><canvas id="chart"></canvas></div>
+
+        <!-- Year table -->
+        <div class="tbl-toggle" onclick="toggleTable()">
+          <span class="tbl-chv" id="tbl-chv">▶</span> Year-by-year breakdown
+        </div>
+        <table class="yr-tbl" id="yr-tbl">
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th class="r">Balance</th>
+              <th class="r">Contributed</th>
+              <th class="r">Interest</th>
+            </tr>
+          </thead>
+          <tbody id="yr-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Saved Scenarios -->
+    <div class="card">
+      <div class="card-title">Saved Scenarios</div>
+      <div id="sc-list"><div class="empty">No saved scenarios yet.</div></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Save modal -->
+<div id="save-modal">
+  <div class="modal-box">
+    <div class="modal-title">Name this scenario</div>
+    <div class="fw"><input class="fi" id="sc-name-inp" placeholder="e.g. Retirement Fund" style="padding-left:12px" onkeydown="if(event.key==='Enter')confirmSave()"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn primary" onclick="confirmSave()">Save</button>
+      <button class="btn" onclick="closeSaveModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js + Firebase -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+// ── FIREBASE CONFIG (same project as Sarath Lifts) ───────────────────────────
+// Add to Firestore security rules:
+// match /users/{uid}/scenarios/{sid} {
+//   allow read, write: if request.auth != null && request.auth.uid == uid;
+// }
+const firebaseConfig = {
+  apiKey:            "AIzaSyAv-8nTj8rYEKoVteVMMEGRW6tGM75VVMc",
+  authDomain:        "shirtoff-tracker.firebaseapp.com",
+  projectId:         "shirtoff-tracker",
+  storageBucket:     "shirtoff-tracker.firebasestorage.app",
+  messagingSenderId: "646335256810",
+  appId:             "1:646335256810:web:282936e1b9c60ed1fc5f93"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+let currentUser  = null;
+let chartInst    = null;
+let lastInputs   = null; // saved so we can re-run after loading a scenario
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+const fmt   = n => '$' + Math.round(n).toLocaleString('en-US');
+const fmtK  = n => { if (n >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M'; if (n >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K'; return fmt(n); };
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+window.signIn = () => {
+  document.getElementById('auth-error').textContent = '';
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .catch(e => { document.getElementById('auth-error').textContent = e.message; });
+};
+window.signOut = () => auth.signOut();
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById('auth-screen').style.display  = 'none';
+    document.getElementById('app-shell').style.display    = 'block';
+    document.getElementById('date-lbl').textContent =
+      new Date().toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+    await loadScenarios();
+  } else {
+    currentUser = null;
+    document.getElementById('auth-screen').style.display  = 'flex';
+    document.getElementById('app-shell').style.display    = 'none';
+  }
+});
+
+// ── CALCULATION ───────────────────────────────────────────────────────────────
+// Returns year-by-year rows: { year, balance, contributions, interest }
+function calcRows(principal, monthly, years, annualRate, frequency) {
+  const r  = annualRate / 100;
+  // Effective monthly rate derived from compound frequency
+  const mr = r === 0 ? 0 : Math.pow(1 + r / frequency, frequency / 12) - 1;
+  const rows = [];
+  let bal = principal;
+  for (let y = 1; y <= years; y++) {
+    for (let m = 0; m < 12; m++) bal = bal * (1 + mr) + monthly;
+    const contrib = principal + monthly * y * 12;
+    rows.push({ year: y, balance: bal, contributions: contrib, interest: bal - contrib });
+  }
+  return rows;
+}
+
+function getInputs() {
+  const principal = parseFloat(document.getElementById('f-principal').value) || 0;
+  const monthly   = parseFloat(document.getElementById('f-monthly').value)   || 0;
+  const years     = parseInt(document.getElementById('f-years').value)        || 0;
+  const rate      = parseFloat(document.getElementById('f-rate').value)       || 0;
+  const variance  = parseFloat(document.getElementById('f-variance').value)   || 0;
+  const freq      = parseInt(document.getElementById('f-freq').value)         || 12;
+  return { principal, monthly, years, rate, variance, freq };
+}
+
+window.runCalc = () => {
+  const { principal, monthly, years, rate, variance, freq } = getInputs();
+  if (!years || !rate) { showToast('Enter years and interest rate'); return; }
+
+  lastInputs = { principal, monthly, years, rate, variance, freq };
+
+  const base = calcRows(principal, monthly, years, rate, freq);
+  const hasVar = variance > 0;
+  const low  = hasVar ? calcRows(principal, monthly, years, Math.max(0, rate - variance), freq) : null;
+  const high = hasVar ? calcRows(principal, monthly, years, rate + variance, freq) : null;
+
+  const last = base[base.length - 1];
+
+  // ── Summary
+  document.getElementById('no-var-summary').style.display = hasVar ? 'none' : 'block';
+  document.getElementById('var-summary').style.display    = hasVar ? 'block' : 'none';
+
+  if (!hasVar) {
+    document.getElementById('r-final').textContent    = fmt(last.balance);
+    document.getElementById('r-contrib').textContent  = fmt(last.contributions);
+    document.getElementById('r-interest').textContent = fmt(last.interest);
+  } else {
+    const ll = low[low.length-1], hl = high[high.length-1];
+    document.getElementById('v-rate-low').textContent   = (rate - variance).toFixed(1) + '% / yr';
+    document.getElementById('v-rate-base').textContent  = rate.toFixed(1) + '% / yr';
+    document.getElementById('v-rate-high').textContent  = (rate + variance).toFixed(1) + '% / yr';
+    document.getElementById('v-final-low').textContent  = fmt(ll.balance);
+    document.getElementById('v-final-base').textContent = fmt(last.balance);
+    document.getElementById('v-final-high').textContent = fmt(hl.balance);
+    document.getElementById('rv-contrib').textContent   = fmt(last.contributions);
+    document.getElementById('rv-interest').textContent  = fmt(last.interest);
+  }
+
+  // ── Chart
+  const labels   = base.map(r => 'Yr ' + r.year);
+  const contribs = base.map(r => Math.max(0, r.contributions));
+  const ints     = base.map(r => Math.max(0, r.interest));
+
+  const datasets = [
+    { label: 'Contributions', data: contribs, backgroundColor: 'rgba(154,161,173,0.55)', stack: 's', order: 2 },
+    { label: 'Interest',      data: ints,     backgroundColor: 'rgba(79,209,165,0.75)',  stack: 's', order: 2 },
+  ];
+
+  if (hasVar) {
+    datasets.push({
+      type: 'line', label: 'Pessimistic',
+      data: low.map(r => r.balance),
+      borderColor: 'rgba(232,105,95,.8)', borderWidth: 1.5,
+      borderDash: [4,3], pointRadius: 0, fill: false, order: 1
+    });
+    datasets.push({
+      type: 'line', label: 'Optimistic',
+      data: high.map(r => r.balance),
+      borderColor: 'rgba(107,159,255,.8)', borderWidth: 1.5,
+      borderDash: [4,3], pointRadius: 0, fill: false, order: 1
+    });
+  }
+
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(document.getElementById('chart'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 400 },
+      plugins: {
+        legend: { labels: { color: '#9aa1ad', boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + ctx.dataset.label + ': ' + fmtK(ctx.raw)
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          ticks: { color: '#9aa1ad', font: { size: 10 },
+            maxTicksLimit: Math.min(years, 10),
+            maxRotation: 0
+          },
+          grid: { color: 'rgba(44,49,60,.6)' }
+        },
+        y: {
+          stacked: true,
+          ticks: { color: '#9aa1ad', font: { size: 10 }, callback: v => fmtK(v) },
+          grid: { color: 'rgba(44,49,60,.6)' }
+        }
+      }
+    }
+  });
+
+  // ── Year table
+  const tbody = document.getElementById('yr-tbody');
+  tbody.innerHTML = '';
+  // Show every year if ≤20, else every 5
+  const step = years > 20 ? 5 : 1;
+  base.forEach(row => {
+    if (row.year % step !== 0 && row.year !== years) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${row.year}</td>` +
+      `<td class="r">${fmt(row.balance)}</td>` +
+      `<td class="r">${fmt(row.contributions)}</td>` +
+      `<td class="r">${fmt(row.interest)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+window.resetCalc = () => {
+  ['f-principal','f-monthly','f-years','f-rate','f-variance'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-freq').value = '12';
+  document.getElementById('results').style.display = 'none';
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  lastInputs = null;
+};
+
+window.toggleTable = () => {
+  const tbl = document.getElementById('yr-tbl');
+  const chv = document.getElementById('tbl-chv');
+  tbl.classList.toggle('open');
+  chv.classList.toggle('open');
+};
+
+// ── FIRESTORE ─────────────────────────────────────────────────────────────────
+const scRef = () => db.collection('users').doc(currentUser.uid).collection('scenarios');
+
+async function loadScenarios() {
+  try {
+    const snap = await scRef().orderBy('savedAt', 'desc').get();
+    const list = document.getElementById('sc-list');
+    if (snap.empty) { list.innerHTML = '<div class="empty">No saved scenarios yet.</div>'; return; }
+    list.innerHTML = '';
+    snap.forEach(doc => renderScenarioItem(doc.id, doc.data(), list));
+  } catch (e) {
+    console.warn('Could not load scenarios', e);
+  }
+}
+
+function renderScenarioItem(id, data, container) {
+  const div = document.createElement('div');
+  div.className = 'sc-item';
+  div.id = 'sc-' + id;
+  const freq = { 1:'Annually', 2:'Semi-ann.', 4:'Quarterly', 12:'Monthly', 365:'Daily' };
+  div.innerHTML =
+    `<div class="sc-info">` +
+    `<div class="sc-name">${esc(data.name)}</div>` +
+    `<div class="sc-meta">$${(data.principal||0).toLocaleString()} + $${(data.monthly||0).toLocaleString()}/mo · ` +
+    `${data.years}yr · ${data.rate}% · ${freq[data.freq]||'Monthly'}</div></div>` +
+    `<button class="sc-btn load" onclick="loadScenario('${id}')">Load</button>` +
+    `<button class="sc-btn del"  onclick="deleteScenario('${id}')">✕</button>`;
+  container.appendChild(div);
+}
+
+window.openSaveModal = () => {
+  if (!lastInputs) { showToast('Run a calculation first'); return; }
+  document.getElementById('sc-name-inp').value = '';
+  document.getElementById('save-modal').classList.add('open');
+  setTimeout(() => document.getElementById('sc-name-inp').focus(), 100);
+};
+
+window.closeSaveModal = () => {
+  document.getElementById('save-modal').classList.remove('open');
+};
+
+window.confirmSave = async () => {
+  const name = document.getElementById('sc-name-inp').value.trim();
+  if (!name) { showToast('Enter a name'); return; }
+  closeSaveModal();
+  try {
+    const docRef = await scRef().add({ ...lastInputs, name, savedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const list = document.getElementById('sc-list');
+    if (list.querySelector('.empty')) list.innerHTML = '';
+    renderScenarioItem(docRef.id, { ...lastInputs, name }, list);
+    showToast('Saved: ' + name);
+  } catch (e) {
+    showToast('Could not save');
+  }
+};
+
+window.loadScenario = async (id) => {
+  try {
+    const doc = await scRef().doc(id).get();
+    if (!doc.exists) return;
+    const d = doc.data();
+    document.getElementById('f-principal').value = d.principal || '';
+    document.getElementById('f-monthly').value   = d.monthly   || '';
+    document.getElementById('f-years').value     = d.years     || '';
+    document.getElementById('f-rate').value      = d.rate      || '';
+    document.getElementById('f-variance').value  = d.variance  || '';
+    document.getElementById('f-freq').value      = d.freq      || 12;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast('Loaded: ' + d.name);
+    lastInputs = { principal: d.principal, monthly: d.monthly, years: d.years, rate: d.rate, variance: d.variance, freq: d.freq };
+    runCalc();
+  } catch (e) {
+    showToast('Could not load scenario');
+  }
+};
+
+window.deleteScenario = async (id) => {
+  try {
+    await scRef().doc(id).delete();
+    const el = document.getElementById('sc-' + id);
+    if (el) el.remove();
+    const list = document.getElementById('sc-list');
+    if (!list.children.length) list.innerHTML = '<div class="empty">No saved scenarios yet.</div>';
+    showToast('Deleted');
+  } catch (e) {
+    showToast('Could not delete');
+  }
+};
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
