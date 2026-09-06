@@ -43,20 +43,31 @@
   .day-content.collapsed{display:none;}
   .progress-bar{height:4px;background:var(--card2);border-radius:4px;overflow:hidden;margin:4px 6px 8px;}
   .progress-fill{height:100%;background:var(--accent);width:0%;transition:width .2s;}
-  .block-label{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin:8px 4px 4px;}
+  /* ── Warm-up list ── */
+  .block-label{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin:10px 4px 4px;}
+  .warmup-list{margin-bottom:6px;}
+  .warmup-item{display:flex;align-items:baseline;gap:8px;padding:5px 6px;border-bottom:1px solid var(--border);}
+  .warmup-item:last-child{border-bottom:none;}
+  .warmup-dot{color:var(--sub);font-size:10px;flex-shrink:0;margin-top:2px;}
+  .warmup-body{min-width:0;}
+  .warmup-name{font-size:13px;font-weight:600;}
+  .warmup-meta{font-size:11px;color:var(--sub);}
+  .warmup-cue{font-size:11.5px;color:var(--sub);line-height:1.35;margin-top:1px;}
+
+  /* ── Working exercise card ── */
   .ex-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:9px 12px;margin-bottom:6px;}
-  .ex-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-  .ex-name{font-size:14px;font-weight:600;line-height:1.3;}
-  .ex-meta{font-size:12px;color:var(--sub);white-space:nowrap;margin-top:1px;}
-  .cue{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.4;}
-  .set-row{display:flex;align-items:center;gap:8px;margin-top:5px;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:5px 8px;}
-  .set-row.done{background:rgba(79,209,165,0.15);border-color:var(--accent2);}
-  .set-idx{font-size:11px;color:var(--sub);width:38px;flex-shrink:0;}
-  .field{display:flex;flex-direction:column;flex:1;min-width:0;}
-  .field-label{font-size:9.5px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px;}
-  .set-input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:2px 0;outline:none;}
-  .set-input::placeholder{color:var(--sub);font-weight:400;}
-  .set-check{font-size:18px;flex-shrink:0;width:26px;text-align:center;cursor:pointer;}
+  .ex-card.done{border-color:var(--accent2);background:rgba(79,209,165,0.07);}
+  .ex-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .ex-name{font-size:14px;font-weight:600;}
+  .ex-meta{font-size:12px;color:var(--sub);white-space:nowrap;}
+  .cue{font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .ex-inputs{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  .inp-wrap{display:flex;align-items:center;gap:5px;flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;}
+  .inp-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;flex-shrink:0;}
+  .ex-inp{flex:1;min-width:0;background:transparent;border:none;color:var(--text);font-size:13px;font-weight:600;outline:none;width:100%;}
+  .ex-inp::placeholder{color:var(--sub);font-weight:400;}
+  .ex-check{font-size:20px;flex-shrink:0;width:28px;text-align:center;cursor:pointer;color:var(--sub);}
+  .ex-check.done{color:var(--accent);}
   .footer-actions{display:flex;gap:8px;padding:12px 10px 4px;}
   .btn{flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;font-weight:600;text-align:center;cursor:pointer;}
   .btn.primary{background:var(--accent);color:#062018;border-color:var(--accent);}
@@ -310,13 +321,13 @@ function bootApp() {
   }
 
   // ── PROGRESS ───────────────────────────────────────────────────────────────
+  // Track working exercises (non-warm-up) done vs total.
   function computeProgress(dayIdx) {
     let total = 0, done = 0;
     PROGRAM[dayIdx].exercises.forEach((ex, ei) => {
-      total += ex.sets;
-      for (let s = 0; s < ex.sets; s++) {
-        if (state[dayIdx]?.[sKey(ei, s)]?.done) done++;
-      }
+      if (ex.block === 'Warm-up') return;
+      total++;
+      if (state[dayIdx]?.[ei]?.done) done++;
     });
     return { total, done };
   }
@@ -327,7 +338,7 @@ function bootApp() {
     const fill = document.getElementById('pf-' + dayIdx);
     const text = document.getElementById('pt-' + dayIdx);
     if (fill) fill.style.width = pct + '%';
-    if (text) text.textContent = done + '/' + total + ' sets logged';
+    if (text) text.textContent = done + '/' + total + ' exercises done';
   }
 
   // ── RENDERER ───────────────────────────────────────────────────────────────
@@ -387,80 +398,97 @@ function bootApp() {
         lbl.textContent = group.label;
         content.appendChild(lbl);
 
-        group.items.forEach(({ ex, ei }) => {
-          const card = document.createElement('div');
-          card.className = 'ex-card';
-          card.innerHTML =
-            `<div class="ex-top">` +
-            `<div class="ex-name">${esc(ex.name)}</div>` +
-            `<div class="ex-meta">${ex.sets}×${esc(ex.reps)}</div></div>` +
-            `<div class="cue">${esc(ex.cue)}</div>`;
+        if (group.label === 'Warm-up') {
+          // ── Warm-up: plain list, no inputs ──────────────────────────────
+          const list = document.createElement('div');
+          list.className = 'warmup-list';
+          group.items.forEach(({ ex }) => {
+            const item = document.createElement('div');
+            item.className = 'warmup-item';
+            item.innerHTML =
+              `<span class="warmup-dot">●</span>` +
+              `<div class="warmup-body">` +
+              `<span class="warmup-name">${esc(ex.name)}</span>` +
+              `<span class="warmup-meta"> &nbsp;${ex.sets}×${esc(ex.reps)}</span>` +
+              (ex.cue ? `<div class="warmup-cue">${esc(ex.cue)}</div>` : '') +
+              `</div>`;
+            list.appendChild(item);
+          });
+          content.appendChild(list);
+        } else {
+          // ── Working exercises: one card per exercise ─────────────────────
+          group.items.forEach(({ ex, ei }) => {
+            const saved = state[dayIdx]?.[ei] || {};
+            const isDone = !!saved.done;
 
-          for (let s = 0; s < ex.sets; s++) {
-            const k = sKey(ei, s);
-            const saved = state[dayIdx]?.[k] || {};
-            const row = document.createElement('div');
-            row.className = 'set-row' + (saved.done ? ' done' : '');
+            const card = document.createElement('div');
+            card.className = 'ex-card' + (isDone ? ' done' : '');
+            card.innerHTML =
+              `<div class="ex-top">` +
+              `<div class="ex-name">${esc(ex.name)}</div>` +
+              `<div class="ex-meta">${ex.sets}×${esc(ex.reps)}</div></div>` +
+              (ex.cue ? `<div class="cue">${esc(ex.cue)}</div>` : '');
 
-            const idxLbl = document.createElement('div');
-            idxLbl.className = 'set-idx';
-            idxLbl.textContent = 'Set ' + (s + 1);
-            row.appendChild(idxLbl);
+            // Input row
+            const inputs = document.createElement('div');
+            inputs.className = 'ex-inputs';
 
-            // Weight field
-            const wf = document.createElement('div');
-            wf.className = 'field';
-            wf.innerHTML = '<div class="field-label">Weight</div>';
+            // Weight input
+            const ww = document.createElement('div');
+            ww.className = 'inp-wrap';
+            ww.innerHTML = `<span class="inp-lbl">Weight</span>`;
             const wi = document.createElement('input');
-            wi.className = 'set-input';
+            wi.className = 'ex-inp';
             wi.setAttribute('inputmode','decimal');
             wi.placeholder = 'lb';
             wi.value = saved.weight || '';
             wi.oninput = () => {
               (state[dayIdx] ??= {});
-              (state[dayIdx][k] ??= {});
-              state[dayIdx][k].weight = wi.value;
+              (state[dayIdx][ei] ??= {});
+              state[dayIdx][ei].weight = wi.value;
             };
-            wf.appendChild(wi);
-            row.appendChild(wf);
+            ww.appendChild(wi);
+            inputs.appendChild(ww);
 
-            // Seat/pin field
+            // Seat/pin input (only if exercise needs it)
             if (ex.height) {
-              const hf = document.createElement('div');
-              hf.className = 'field';
-              hf.innerHTML = '<div class="field-label">Seat/pin</div>';
+              const hw = document.createElement('div');
+              hw.className = 'inp-wrap';
+              hw.innerHTML = `<span class="inp-lbl">Seat/pin</span>`;
               const hi = document.createElement('input');
-              hi.className = 'set-input';
+              hi.className = 'ex-inp';
               hi.setAttribute('inputmode','text');
               hi.placeholder = '#';
               hi.value = saved.height || '';
               hi.oninput = () => {
                 (state[dayIdx] ??= {});
-                (state[dayIdx][k] ??= {});
-                state[dayIdx][k].height = hi.value;
+                (state[dayIdx][ei] ??= {});
+                state[dayIdx][ei].height = hi.value;
               };
-              hf.appendChild(hi);
-              row.appendChild(hf);
+              hw.appendChild(hi);
+              inputs.appendChild(hw);
             }
 
-            // Done toggle
+            // Done toggle (per exercise)
             const chk = document.createElement('div');
-            chk.className = 'set-check';
-            chk.textContent = saved.done ? '✓' : '○';
+            chk.className = 'ex-check' + (isDone ? ' done' : '');
+            chk.textContent = isDone ? '✓' : '○';
             chk.onclick = () => {
               (state[dayIdx] ??= {});
-              (state[dayIdx][k] ??= {});
-              const nowDone = !state[dayIdx][k].done;
-              state[dayIdx][k].done = nowDone;
+              (state[dayIdx][ei] ??= {});
+              const nowDone = !state[dayIdx][ei].done;
+              state[dayIdx][ei].done = nowDone;
               chk.textContent = nowDone ? '✓' : '○';
-              row.classList.toggle('done', nowDone);
+              chk.classList.toggle('done', nowDone);
+              card.classList.toggle('done', nowDone);
               updateProgressBar(dayIdx);
             };
-            row.appendChild(chk);
-            card.appendChild(row);
-          }
-          content.appendChild(card);
-        });
+            inputs.appendChild(chk);
+
+            card.appendChild(inputs);
+            content.appendChild(card);
+          });
+        }
       });
 
       main.appendChild(content);
