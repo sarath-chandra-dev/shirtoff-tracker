@@ -1,4 +1,4 @@
-# ShirtOff Protocol v2
+# Sarath Lifts
 
 A cross-device gym workout tracker — one HTML file, Firebase backend, hosted free on GitHub Pages.
 
