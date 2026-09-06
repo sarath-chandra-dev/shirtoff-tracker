@@ -107,6 +107,7 @@
   .sc-info{flex:1;min-width:0;}
   .sc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sc-meta{font-size:11px;color:var(--sub);}
+  .sc-bal{font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;min-width:52px;text-align:right;}
   .sc-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0;}
   .sc-btn.load{color:var(--accent);border-color:rgba(79,209,165,.4);}
   .sc-btn.del{color:var(--danger);border-color:rgba(232,105,95,.3);}
@@ -257,10 +258,16 @@
       </div>
     </div>
 
+    <!-- Compare Projections (shown when 2+ scenarios exist) -->
+    <div class="card" id="compare-section" style="display:none">
+      <div class="card-title">Projection Comparison</div>
+      <div class="chart-wrap" style="height:200px"><canvas id="compare-chart"></canvas></div>
+    </div>
+
     <!-- Saved Scenarios -->
     <div class="card">
-      <div class="card-title">Saved Scenarios</div>
-      <div id="sc-list"><div class="empty">No saved scenarios yet.</div></div>
+      <div class="card-title">Saved Projections</div>
+      <div id="sc-list"><div class="empty">No saved projections yet.</div></div>
     </div>
   </main>
 </div>
@@ -509,31 +516,114 @@ window.toggleTable = () => {
 // ── FIRESTORE ─────────────────────────────────────────────────────────────────
 const scRef = () => db.collection('users').doc(currentUser.uid).collection('scenarios');
 
+let savedScenarios = []; // { id, data } — in-memory list kept in sync with Firestore
+let compareChartInst = null;
+
+// Colors cycled across scenario bars in the comparison chart
+const SC_COLORS = [
+  'rgba(79,209,165,.75)', 'rgba(107,159,255,.75)', 'rgba(232,184,75,.75)',
+  'rgba(232,105,95,.75)', 'rgba(165,107,209,.75)', 'rgba(107,200,232,.75)',
+];
+const SC_COLORS_LIGHT = [
+  'rgba(45,168,124,.75)', 'rgba(59,111,212,.75)', 'rgba(217,119,6,.75)',
+  'rgba(185,40,40,.7)',   'rgba(120,60,180,.7)',  'rgba(14,130,170,.7)',
+];
+
+function calcFinalBalance(data) {
+  const rows = calcRows(data.principal || 0, data.monthly || 0, data.years || 0, data.rate || 0, data.freq || 12);
+  return rows.length ? rows[rows.length - 1].balance : 0;
+}
+
 async function loadScenarios() {
   try {
     const snap = await scRef().orderBy('savedAt', 'desc').get();
-    const list = document.getElementById('sc-list');
-    if (snap.empty) { list.innerHTML = '<div class="empty">No saved scenarios yet.</div>'; return; }
-    list.innerHTML = '';
-    snap.forEach(doc => renderScenarioItem(doc.id, doc.data(), list));
+    savedScenarios = [];
+    snap.forEach(doc => savedScenarios.push({ id: doc.id, data: doc.data() }));
+    renderScenarioList();
+    renderCompareChart();
   } catch (e) {
     console.warn('Could not load scenarios', e);
   }
 }
 
-function renderScenarioItem(id, data, container) {
+function renderScenarioList() {
+  const list = document.getElementById('sc-list');
+  if (!savedScenarios.length) {
+    list.innerHTML = '<div class="empty">No saved projections yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  savedScenarios.forEach(s => renderScenarioItem(s.id, s.data));
+}
+
+function renderScenarioItem(id, data) {
   const div = document.createElement('div');
   div.className = 'sc-item';
   div.id = 'sc-' + id;
   const freq = { 1:'Annually', 2:'Semi-ann.', 4:'Quarterly', 12:'Monthly', 365:'Daily' };
+  const finalBal = calcFinalBalance(data);
   div.innerHTML =
     `<div class="sc-info">` +
     `<div class="sc-name">${esc(data.name)}</div>` +
     `<div class="sc-meta">$${(data.principal||0).toLocaleString()} + $${(data.monthly||0).toLocaleString()}/mo · ` +
     `${data.years}yr · ${data.rate}% · ${freq[data.freq]||'Monthly'}</div></div>` +
+    `<div class="sc-bal">${fmtK(finalBal)}</div>` +
     `<button class="sc-btn load" onclick="loadScenario('${id}')">Load</button>` +
     `<button class="sc-btn del"  onclick="deleteScenario('${id}')">✕</button>`;
-  container.appendChild(div);
+  document.getElementById('sc-list').appendChild(div);
+}
+
+function renderCompareChart() {
+  const section = document.getElementById('compare-section');
+  if (savedScenarios.length < 2) {
+    section.style.display = 'none';
+    if (compareChartInst) { compareChartInst.destroy(); compareChartInst = null; }
+    return;
+  }
+  section.style.display = 'block';
+
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tick = dark ? '#9aa1ad' : '#6b7280';
+  const grid = dark ? 'rgba(44,49,60,.6)' : 'rgba(200,210,225,.6)';
+  const palette = dark ? SC_COLORS : SC_COLORS_LIGHT;
+
+  const labels   = savedScenarios.map(s => s.data.name);
+  const balances = savedScenarios.map(s => calcFinalBalance(s.data));
+  const contribs = savedScenarios.map(s =>
+    (s.data.principal || 0) + (s.data.monthly || 0) * (s.data.years || 0) * 12
+  );
+  const interests = balances.map((b, i) => Math.max(0, b - contribs[i]));
+  const barColors = savedScenarios.map((_, i) => palette[i % palette.length]);
+
+  if (compareChartInst) compareChartInst.destroy();
+  compareChartInst = new Chart(document.getElementById('compare-chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Contributions', data: contribs,
+          backgroundColor: dark ? 'rgba(154,161,173,.45)' : 'rgba(107,114,128,.35)', stack: 's' },
+        { label: 'Interest', data: interests, backgroundColor: barColors, stack: 's' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { labels: { color: tick, boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + ctx.dataset.label + ': ' + fmtK(ctx.raw),
+            afterBody: items => ' Final: ' + fmt(balances[items[0].dataIndex])
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: tick, font: { size: 10 }, maxRotation: 20 }, grid: { color: grid } },
+        y: { stacked: true, ticks: { color: tick, font: { size: 10 }, callback: v => fmtK(v) }, grid: { color: grid } }
+      }
+    }
+  });
 }
 
 window.openSaveModal = () => {
@@ -553,42 +643,38 @@ window.confirmSave = async () => {
   closeSaveModal();
   try {
     const docRef = await scRef().add({ ...lastInputs, name, savedAt: firebase.firestore.FieldValue.serverTimestamp() });
-    const list = document.getElementById('sc-list');
-    if (list.querySelector('.empty')) list.innerHTML = '';
-    renderScenarioItem(docRef.id, { ...lastInputs, name }, list);
+    savedScenarios.unshift({ id: docRef.id, data: { ...lastInputs, name } });
+    renderScenarioList();
+    renderCompareChart();
     showToast('Saved: ' + name);
   } catch (e) {
     showToast('Could not save');
   }
 };
 
-window.loadScenario = async (id) => {
-  try {
-    const doc = await scRef().doc(id).get();
-    if (!doc.exists) return;
-    const d = doc.data();
-    document.getElementById('f-principal').value = d.principal || '';
-    document.getElementById('f-monthly').value   = d.monthly   || '';
-    document.getElementById('f-years').value     = d.years     || '';
-    document.getElementById('f-rate').value      = d.rate      || '';
-    document.getElementById('f-variance').value  = d.variance  || '';
-    document.getElementById('f-freq').value      = d.freq      || 12;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast('Loaded: ' + d.name);
-    lastInputs = { principal: d.principal, monthly: d.monthly, years: d.years, rate: d.rate, variance: d.variance, freq: d.freq };
-    runCalc();
-  } catch (e) {
-    showToast('Could not load scenario');
-  }
+window.loadScenario = (id) => {
+  const found = savedScenarios.find(s => s.id === id);
+  if (!found) return;
+  const d = found.data;
+  document.getElementById('f-principal').value = d.principal || '';
+  document.getElementById('f-monthly').value   = d.monthly   || '';
+  document.getElementById('f-years').value     = d.years     || '';
+  document.getElementById('f-rate').value      = d.rate      || '';
+  document.getElementById('f-variance').value  = d.variance  || '';
+  document.getElementById('f-freq').value      = d.freq      || 12;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showToast('Loaded: ' + d.name);
+  lastInputs = { principal: d.principal, monthly: d.monthly, years: d.years,
+                 rate: d.rate, variance: d.variance, freq: d.freq };
+  runCalc();
 };
 
 window.deleteScenario = async (id) => {
   try {
     await scRef().doc(id).delete();
-    const el = document.getElementById('sc-' + id);
-    if (el) el.remove();
-    const list = document.getElementById('sc-list');
-    if (!list.children.length) list.innerHTML = '<div class="empty">No saved scenarios yet.</div>';
+    savedScenarios = savedScenarios.filter(s => s.id !== id);
+    renderScenarioList();
+    renderCompareChart();
     showToast('Deleted');
   } catch (e) {
     showToast('Could not delete');
