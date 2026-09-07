@@ -201,9 +201,14 @@
           </div>
         </div>
       </div>
+      <div id="loaded-banner" style="display:none;font-size:11px;color:var(--accent);margin-top:12px;">
+        Editing: <strong id="loaded-name"></strong>
+      </div>
       <div class="btn-row">
         <button class="btn primary" onclick="runCalc()">Calculate</button>
-        <button class="btn" onclick="openSaveModal()">Save</button>
+        <button class="btn" id="btn-save" onclick="openSaveModal()">Save</button>
+        <button class="btn" id="btn-update" onclick="updateLoaded()" style="display:none">Update</button>
+        <button class="btn" id="btn-save-new" onclick="openSaveModal()" style="display:none">Save as New</button>
         <button class="btn outline-danger" onclick="resetCalc()">Reset</button>
       </div>
     </div>
@@ -328,9 +333,20 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-let currentUser  = null;
-let chartInst    = null;
-let lastInputs   = null; // saved so we can re-run after loading a scenario
+let currentUser      = null;
+let chartInst        = null;
+let lastInputs       = null;
+let loadedScenarioId = null; // set when a projection is loaded for editing
+
+function setLoadedState(id, name) {
+  loadedScenarioId = id;
+  const on = !!id;
+  document.getElementById('btn-save').style.display     = on ? 'none' : '';
+  document.getElementById('btn-update').style.display   = on ? ''     : 'none';
+  document.getElementById('btn-save-new').style.display = on ? ''     : 'none';
+  document.getElementById('loaded-banner').style.display = on ? 'block' : 'none';
+  if (name) document.getElementById('loaded-name').textContent = name;
+}
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 const fmt   = n => '$' + Math.round(n).toLocaleString('en-US');
@@ -521,6 +537,7 @@ window.resetCalc = () => {
   document.getElementById('results').style.display = 'none';
   if (chartInst) { chartInst.destroy(); chartInst = null; }
   lastInputs = null;
+  setLoadedState(null, null);
 };
 
 window.toggleTable = () => {
@@ -712,7 +729,23 @@ window.loadScenario = (id) => {
   showToast('Loaded: ' + d.name);
   lastInputs = { principal: d.principal, monthly: d.monthly, years: d.years,
                  rate: d.rate, variance: d.variance, freq: d.freq };
+  setLoadedState(id, d.name);
   runCalc();
+};
+
+window.updateLoaded = async () => {
+  const inputs = getInputs();
+  if (!inputs.years || !inputs.rate) { showToast('Enter years and interest rate'); return; }
+  try {
+    await scRef().doc(loadedScenarioId).update(inputs);
+    const sc = savedScenarios.find(s => s.id === loadedScenarioId);
+    if (sc) sc.data = { ...sc.data, ...inputs };
+    renderScenarioList();
+    renderCompareChart();
+    showToast('Projection updated');
+  } catch (e) {
+    showToast('Could not update');
+  }
 };
 
 window.deleteScenario = async (id) => {
