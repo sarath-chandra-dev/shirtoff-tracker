@@ -104,6 +104,7 @@
   /* ── Scenarios ── */
   .sc-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);}
   .sc-item:last-child{border-bottom:none;}
+  .sc-check{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
   .sc-info{flex:1;min-width:0;}
   .sc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .sc-meta{font-size:11px;color:var(--sub);}
@@ -112,6 +113,14 @@
   .sc-btn.load{color:var(--accent);border-color:rgba(79,209,165,.4);}
   .sc-btn.del{color:var(--danger);border-color:rgba(232,105,95,.3);}
   .empty{font-size:13px;color:var(--sub);text-align:center;padding:18px 0;}
+
+  /* ── Compare collapse ── */
+  .compare-hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;margin-bottom:0;}
+  .compare-chv{font-size:10px;color:var(--sub);transition:transform .2s;}
+  .compare-chv.open{transform:rotate(90deg);}
+  #compare-body{display:none;margin-top:12px;}
+  #compare-body.open{display:block;}
+  .compare-hint{font-size:12px;color:var(--sub);text-align:center;padding:10px 0;}
 
   /* ── Save modal ── */
   #save-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:20px;}
@@ -258,10 +267,17 @@
       </div>
     </div>
 
-    <!-- Compare Projections (shown when 2+ scenarios exist) -->
+    <!-- Compare Projections — collapsed by default; shown when 2+ projections exist -->
     <div class="card" id="compare-section" style="display:none">
-      <div class="card-title">Projection Comparison</div>
-      <div class="chart-wrap" style="height:200px"><canvas id="compare-chart"></canvas></div>
+      <div class="compare-hdr" onclick="toggleCompare()">
+        <div class="card-title" style="margin:0">Projection Comparison</div>
+        <span class="compare-chv" id="compare-chv">▶</span>
+      </div>
+      <div id="compare-body">
+        <!-- Chart renders here when 2+ projections are checked above -->
+        <div id="compare-hint" class="compare-hint" style="display:none">Select 2 or more projections to compare.</div>
+        <div class="chart-wrap" style="height:200px;display:none" id="compare-chart-wrap"><canvas id="compare-chart"></canvas></div>
+      </div>
     </div>
 
     <!-- Saved Scenarios -->
@@ -563,6 +579,7 @@ function renderScenarioItem(id, data) {
   const freq = { 1:'Annually', 2:'Semi-ann.', 4:'Quarterly', 12:'Monthly', 365:'Daily' };
   const finalBal = calcFinalBalance(data);
   div.innerHTML =
+    `<input type="checkbox" class="sc-check" id="chk-${id}" title="Include in comparison" onchange="updateCompare()" checked>` +
     `<div class="sc-info">` +
     `<div class="sc-name">${esc(data.name)}</div>` +
     `<div class="sc-meta">$${(data.principal||0).toLocaleString()} + $${(data.monthly||0).toLocaleString()}/mo · ` +
@@ -573,8 +590,20 @@ function renderScenarioItem(id, data) {
   document.getElementById('sc-list').appendChild(div);
 }
 
+window.toggleCompare = () => {
+  document.getElementById('compare-body').classList.toggle('open');
+  document.getElementById('compare-chv').classList.toggle('open');
+};
+
+// Called whenever a checkbox changes — re-renders comparison with only checked projections
+window.updateCompare = () => renderCompareChart();
+
 function renderCompareChart() {
-  const section = document.getElementById('compare-section');
+  const section  = document.getElementById('compare-section');
+  const hint     = document.getElementById('compare-hint');
+  const chartWrap = document.getElementById('compare-chart-wrap');
+
+  // Hide the whole card if fewer than 2 projections are saved
   if (savedScenarios.length < 2) {
     section.style.display = 'none';
     if (compareChartInst) { compareChartInst.destroy(); compareChartInst = null; }
@@ -582,18 +611,34 @@ function renderCompareChart() {
   }
   section.style.display = 'block';
 
-  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const tick = dark ? '#9aa1ad' : '#6b7280';
-  const grid = dark ? 'rgba(44,49,60,.6)' : 'rgba(200,210,225,.6)';
+  // Filter to only checked projections
+  const selected = savedScenarios.filter(s => {
+    const chk = document.getElementById('chk-' + s.id);
+    return chk && chk.checked;
+  });
+
+  // If fewer than 2 are checked, destroy chart and show hint
+  if (selected.length < 2) {
+    if (compareChartInst) { compareChartInst.destroy(); compareChartInst = null; }
+    hint.style.display = 'block';
+    chartWrap.style.display = 'none';
+    return;
+  }
+  hint.style.display = 'none';
+  chartWrap.style.display = 'block';
+
+  const dark    = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const tick    = dark ? '#9aa1ad' : '#6b7280';
+  const grid    = dark ? 'rgba(44,49,60,.6)' : 'rgba(200,210,225,.6)';
   const palette = dark ? SC_COLORS : SC_COLORS_LIGHT;
 
-  const labels   = savedScenarios.map(s => s.data.name);
-  const balances = savedScenarios.map(s => calcFinalBalance(s.data));
-  const contribs = savedScenarios.map(s =>
+  const labels   = selected.map(s => s.data.name);
+  const balances = selected.map(s => calcFinalBalance(s.data));
+  const contribs = selected.map(s =>
     (s.data.principal || 0) + (s.data.monthly || 0) * (s.data.years || 0) * 12
   );
   const interests = balances.map((b, i) => Math.max(0, b - contribs[i]));
-  const barColors = savedScenarios.map((_, i) => palette[i % palette.length]);
+  const barColors = selected.map((_, i) => palette[i % palette.length]);
 
   if (compareChartInst) compareChartInst.destroy();
   compareChartInst = new Chart(document.getElementById('compare-chart'), {
