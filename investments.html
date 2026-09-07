@@ -106,7 +106,8 @@
   .sc-item:last-child{border-bottom:none;}
   .sc-check{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
   .sc-info{flex:1;min-width:0;}
-  .sc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;}
+  .sc-name-input{font-size:13px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--accent);color:var(--text);outline:none;width:100%;padding:0;}
   .sc-meta{font-size:11px;color:var(--sub);}
   .sc-bal{font-size:14px;font-weight:700;color:var(--accent);flex-shrink:0;min-width:52px;text-align:right;}
   .sc-btn{background:none;border:1px solid var(--border);border-radius:8px;color:var(--sub);font-size:11px;font-weight:600;padding:4px 10px;cursor:pointer;flex-shrink:0;}
@@ -581,7 +582,7 @@ function renderScenarioItem(id, data) {
   div.innerHTML =
     `<input type="checkbox" class="sc-check" id="chk-${id}" title="Include in comparison" onchange="updateCompare()" checked>` +
     `<div class="sc-info">` +
-    `<div class="sc-name">${esc(data.name)}</div>` +
+    `<div class="sc-name" ondblclick="startRename('${id}', this)" title="Double-click to rename">${esc(data.name)}</div>` +
     `<div class="sc-meta">$${(data.principal||0).toLocaleString()} + $${(data.monthly||0).toLocaleString()}/mo · ` +
     `${data.years}yr · ${data.rate}% · ${freq[data.freq]||'Monthly'}</div></div>` +
     `<div class="sc-bal">${fmtK(finalBal)}</div>` +
@@ -724,6 +725,42 @@ window.deleteScenario = async (id) => {
   } catch (e) {
     showToast('Could not delete');
   }
+};
+
+window.startRename = (id, el) => {
+  const current = el.textContent;
+  const input = document.createElement('input');
+  input.className = 'sc-name-input';
+  input.value = current;
+  el.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = async () => {
+    const newName = input.value.trim();
+    if (!newName || newName === current) {
+      input.replaceWith(el);
+      return;
+    }
+    try {
+      await scRef().doc(id).update({ name: newName });
+      const sc = savedScenarios.find(s => s.id === id);
+      if (sc) sc.data.name = newName;
+      el.textContent = newName;
+      input.replaceWith(el);
+      renderCompareChart();
+      showToast('Renamed');
+    } catch (e) {
+      input.replaceWith(el);
+      showToast('Could not rename');
+    }
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') input.replaceWith(el);
+  });
+  input.addEventListener('blur', commit);
 };
 
 function esc(s) {
