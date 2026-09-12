@@ -163,7 +163,7 @@
   </main>
 
   <div class="footer-actions" id="footer-actions" style="display:none;">
-    <div class="btn danger-outline" id="reset-btn">Reset day</div>
+    <div class="btn danger-outline" id="reset-btn">Reset</div>
     <div class="btn primary" id="save-btn">Save progress</div>
   </div>
 </div>
@@ -204,6 +204,9 @@ const firebaseConfig = {
 // service cloud.firestore {
 //   match /databases/{database}/documents {
 //     match /users/{uid} {
+//       allow read, write: if request.auth != null && request.auth.uid == uid;
+//     }
+//     match /users/{uid}/state {
 //       allow read, write: if request.auth != null && request.auth.uid == uid;
 //     }
 //     match /users/{uid}/logs/{logId} {
@@ -275,8 +278,7 @@ function bootApp() {
   let editorState  = null;     // working copy used by the editor
 
   // ── UTILS ──────────────────────────────────────────────────────────────────
-  const todayKey = () => new Date().toISOString().slice(0, 10);
-  const sKey     = (ei, si) => ei + '-' + si;
+  const sKey = (ei, si) => ei + '-' + si;
 
   function esc(s) {
     return String(s ?? '')
@@ -301,6 +303,7 @@ function bootApp() {
 
   // ── FIRESTORE ──────────────────────────────────────────────────────────────
   const userRef  = () => db.collection('users').doc(currentUser.uid);
+  const stateRef = () => userRef().collection('state').doc('current');
   const logsRef  = () => userRef().collection('logs');
 
   async function loadProgram() {
@@ -318,13 +321,37 @@ function bootApp() {
   }
 
   async function loadAll() {
-    const doc = await logsRef().doc(todayKey()).get();
-    state = (doc.exists && doc.data()) ? doc.data() : {};
+    // Try the new persistent state doc first
+    const doc = await stateRef().get();
+    if (doc.exists) {
+      state = doc.data();
+      return;
+    }
+    // First-time migration: copy weights from the most recent daily log
+    try {
+      const logs = await logsRef()
+        .orderBy(firebase.firestore.FieldPath.documentId(), 'desc')
+        .limit(1).get();
+      if (!logs.empty) {
+        state = logs.docs[0].data();
+        // Strip done flags — start fresh but keep weights/seat pins
+        Object.keys(state).forEach(di => {
+          Object.keys(state[di] || {}).forEach(ei => {
+            if (state[di][ei]) state[di][ei].done = false;
+          });
+        });
+        await stateRef().set(state);
+      } else {
+        state = {};
+      }
+    } catch (_) {
+      state = {};
+    }
   }
 
   async function saveAll() {
     try {
-      await logsRef().doc(todayKey()).set(state);
+      await stateRef().set(state);
       showToast('Progress saved');
     } catch (e) {
       showToast('Could not save — check connection');
@@ -371,7 +398,7 @@ function bootApp() {
     const main = document.getElementById('main');
     main.innerHTML = '';
     document.getElementById('date-label').textContent =
-      new Date().toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+      new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
 
     PROGRAM.forEach((dayData, dayIdx) => {
       // Initialise collapse state: collapsed by default on first render
@@ -725,8 +752,13 @@ function bootApp() {
   // ── FOOTER BUTTONS ─────────────────────────────────────────────────────────
   document.getElementById('save-btn').onclick = () => saveAll();
   document.getElementById('reset-btn').onclick = async () => {
-    if (!confirm('Reset all logged sets for today?')) return;
-    state = {};
+    if (!confirm('Clear all checkmarks? Weights will be kept.')) return;
+    // Clear done flags only, preserve weights and seat pins
+    Object.keys(state).forEach(di => {
+      Object.keys(state[di] || {}).forEach(ei => {
+        if (state[di][ei]) state[di][ei].done = false;
+      });
+    });
     await saveAll();
     renderAll();
   };
