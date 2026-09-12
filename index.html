@@ -323,26 +323,29 @@ function bootApp() {
   async function loadAll() {
     // Try the new persistent state doc first
     const doc = await stateRef().get();
-    if (doc.exists) {
+    if (doc.exists && Object.keys(doc.data()).length > 0) {
       state = doc.data();
       return;
     }
-    // First-time migration: copy weights from the most recent daily log
+    // First-time migration: find the most recent non-empty daily log
     try {
       const logs = await logsRef()
         .orderBy(firebase.firestore.FieldPath.documentId(), 'desc')
-        .limit(1).get();
-      if (!logs.empty) {
-        state = logs.docs[0].data();
-        // Strip done flags — start fresh but keep weights/seat pins
-        Object.keys(state).forEach(di => {
-          Object.keys(state[di] || {}).forEach(ei => {
-            if (state[di][ei]) state[di][ei].done = false;
+        .get();
+      state = {};
+      for (const logDoc of logs.docs) {
+        const data = logDoc.data();
+        if (data && Object.keys(data).length > 0) {
+          state = data;
+          // Strip done flags — keep weights/seat pins only
+          Object.keys(state).forEach(di => {
+            Object.keys(state[di] || {}).forEach(key => {
+              if (state[di][key]) state[di][key].done = false;
+            });
           });
-        });
-        await stateRef().set(state);
-      } else {
-        state = {};
+          await stateRef().set(state);
+          break;
+        }
       }
     } catch (_) {
       state = {};
