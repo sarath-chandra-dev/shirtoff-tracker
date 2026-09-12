@@ -125,6 +125,15 @@
   .form-actions .btn{padding:9px;font-size:12px;}
   .add-ex{padding:10px 14px;text-align:center;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;border-top:1px solid var(--border);}
   .add-day{border:1px dashed var(--border);border-radius:14px;padding:14px;text-align:center;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:12px;}
+
+  /* ── Confirm modal ── */
+  #confirm-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;align-items:flex-end;justify-content:center;padding:0 0 24px;}
+  #confirm-modal.open{display:flex;}
+  .confirm-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;width:100%;max-width:400px;text-align:center;}
+  .confirm-title{font-size:15px;font-weight:700;margin-bottom:6px;}
+  .confirm-sub{font-size:13px;color:var(--sub);margin-bottom:18px;line-height:1.5;}
+  .confirm-btns{display:flex;gap:8px;}
+  .confirm-btns .btn{padding:12px;}
 </style>
 </head>
 <body>
@@ -168,6 +177,18 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ── Reset confirm modal ─────────────────────────────────────────────────── -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title">Clear checkmarks?</div>
+    <div class="confirm-sub">Your weights and seat pins will be kept.<br>Only the done checkmarks will be cleared.</div>
+    <div class="confirm-btns">
+      <button class="btn" onclick="closeConfirm()">Cancel</button>
+      <button class="btn danger-outline" onclick="confirmReset()">Yes, clear</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Editor overlay ─────────────────────────────────────────────────────── -->
 <div id="editor-overlay">
@@ -756,17 +777,29 @@ function bootApp() {
 
   // ── FOOTER BUTTONS ─────────────────────────────────────────────────────────
   document.getElementById('save-btn').onclick = () => saveAll();
-  document.getElementById('reset-btn').onclick = async () => {
-    if (!confirm('Clear all checkmarks? Weights will be kept.')) return;
-    // Clear done flags only, preserve weights and seat pins
+  document.getElementById('reset-btn').onclick = () => {
+    document.getElementById('confirm-modal').classList.add('open');
+  };
+
+  window.closeConfirm = () => {
+    document.getElementById('confirm-modal').classList.remove('open');
+  };
+
+  window.confirmReset = async () => {
+    closeConfirm();
     Object.keys(state).forEach(di => {
-      Object.keys(state[di] || {}).forEach(ei => {
-        if (state[di][ei]) state[di][ei].done = false;
+      Object.keys(state[di] || {}).forEach(key => {
+        if (state[di][key]) state[di][key].done = false;
       });
     });
     await saveAll();
     renderAll();
   };
+
+  // Close modal on backdrop tap
+  document.getElementById('confirm-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('confirm-modal')) closeConfirm();
+  });
 
   // ── AUTH STATE ─────────────────────────────────────────────────────────────
   auth.onAuthStateChanged(async user => {
