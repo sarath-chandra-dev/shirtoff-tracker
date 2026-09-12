@@ -155,7 +155,6 @@
         <button class="txt-btn muted" onclick="signOut()">Sign out</button>
       </div>
     </div>
-    <p class="sub" id="date-label"></p>
   </header>
 
   <main id="main">
@@ -327,26 +326,31 @@ function bootApp() {
       state = doc.data();
       return;
     }
-    // First-time migration: find the most recent non-empty daily log
+    // First-time migration: merge ALL daily logs oldest→newest so the most
+    // recent weight for each exercise wins across all workout sessions
     try {
       const logs = await logsRef()
-        .orderBy(firebase.firestore.FieldPath.documentId(), 'desc')
+        .orderBy(firebase.firestore.FieldPath.documentId(), 'asc')
         .get();
       state = {};
-      for (const logDoc of logs.docs) {
+      logs.docs.forEach(logDoc => {
         const data = logDoc.data();
-        if (data && Object.keys(data).length > 0) {
-          state = data;
-          // Strip done flags — keep weights/seat pins only
-          Object.keys(state).forEach(di => {
-            Object.keys(state[di] || {}).forEach(key => {
-              if (state[di][key]) state[di][key].done = false;
-            });
+        if (!data || !Object.keys(data).length) return;
+        Object.keys(data).forEach(di => {
+          if (!state[di]) state[di] = {};
+          Object.keys(data[di] || {}).forEach(key => {
+            // Merge fields so a partial update doesn't wipe sibling fields
+            state[di][key] = { ...(state[di][key] || {}), ...data[di][key] };
           });
-          await stateRef().set(state);
-          break;
-        }
-      }
+        });
+      });
+      // Strip done flags — start each exercise unchecked
+      Object.keys(state).forEach(di => {
+        Object.keys(state[di] || {}).forEach(key => {
+          if (state[di][key]) state[di][key].done = false;
+        });
+      });
+      if (Object.keys(state).length > 0) await stateRef().set(state);
     } catch (_) {
       state = {};
     }
@@ -400,8 +404,6 @@ function bootApp() {
   function renderAll() {
     const main = document.getElementById('main');
     main.innerHTML = '';
-    document.getElementById('date-label').textContent =
-      new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
 
     PROGRAM.forEach((dayData, dayIdx) => {
       // Initialise collapse state: collapsed by default on first render
