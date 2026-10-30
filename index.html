@@ -252,7 +252,9 @@ function bootApp() {
   const db   = firebase.firestore();
 
   // ── DEFAULT PROGRAM ────────────────────────────────────────────────────────
-  // Exercises are flat with a `block` field; the renderer groups them by block.
+  // Bump PROGRAM_VERSION whenever cue text or exercise structure changes so
+  // existing Firestore programs are re-seeded automatically on next load.
+  const PROGRAM_VERSION = 2;
   const DEFAULT_PROGRAM = [
     {
       day: 'Day 1', title: 'Push & Heavy Legs',
@@ -329,16 +331,17 @@ function bootApp() {
 
   async function loadProgram() {
     const doc = await userRef().get();
-    if (doc.exists && doc.data().program) {
-      PROGRAM = doc.data().program;
+    const data = doc.exists ? doc.data() : {};
+    if (data.program && data.programVersion === PROGRAM_VERSION) {
+      PROGRAM = data.program;
     } else {
       PROGRAM = JSON.parse(JSON.stringify(DEFAULT_PROGRAM));
-      await userRef().set({ program: PROGRAM }, { merge: true });
+      await userRef().set({ program: PROGRAM, programVersion: PROGRAM_VERSION }, { merge: true });
     }
   }
 
   async function saveProgram() {
-    await userRef().set({ program: PROGRAM }, { merge: true });
+    await userRef().set({ program: PROGRAM, programVersion: PROGRAM_VERSION }, { merge: true });
   }
 
   async function loadAll() {
