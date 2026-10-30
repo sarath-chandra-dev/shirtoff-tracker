@@ -72,6 +72,7 @@
   .ex-name{font-size:14px;font-weight:600;}
   .ex-meta{font-size:12px;color:var(--sub);white-space:nowrap;}
   .cue{font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.35;}
+  .cue-why{font-weight:700;color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-right:2px;}
   .ex-inputs{display:flex;align-items:center;gap:8px;margin-top:8px;}
   .inp-wrap{display:flex;align-items:center;gap:5px;flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 9px;}
   .inp-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;flex-shrink:0;}
@@ -474,7 +475,7 @@ function bootApp() {
               `<div class="warmup-body">` +
               `<span class="warmup-name">${esc(ex.name)}</span>` +
               `<span class="warmup-meta"> &nbsp;${ex.sets}×${esc(ex.reps)}</span>` +
-              (ex.cue ? `<div class="warmup-cue">${esc(ex.cue)}</div>` : '') +
+              (ex.cue ? `<div class="warmup-cue"><span class="cue-why">Why:</span> ${esc(ex.cue)}</div>` : '') +
               `</div>`;
             list.appendChild(item);
           });
@@ -491,7 +492,7 @@ function bootApp() {
               `<div class="ex-top">` +
               `<div class="ex-name">${esc(ex.name)}</div>` +
               `<div class="ex-meta">${ex.sets}×${esc(ex.reps)}</div></div>` +
-              (ex.cue ? `<div class="cue">${esc(ex.cue)}</div>` : '');
+              (ex.cue ? `<div class="cue"><span class="cue-why">Why:</span> ${esc(ex.cue)}</div>` : '');
 
             // Input row
             const inputs = document.createElement('div');
