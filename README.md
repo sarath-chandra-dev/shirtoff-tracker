@@ -1,6 +1,12 @@
-# Sarath Lifts
+# Sarath Lifts · Sarath Invests · Sarath Eats
 
-A cross-device gym workout tracker — one HTML file, Firebase backend, hosted free on GitHub Pages.
+Three small personal apps. Each is a single HTML file with a Firebase backend (Google Sign-In + Firestore), hosted free on GitHub Pages. All three share one Firebase project, one theme, and the same conventions.
+
+| App | File | What it does |
+|-----|------|--------------|
+| **Sarath Lifts** | `index.html` | Gym workout tracker: editable multi-day program, per-exercise weight / seat pin / done |
+| **Sarath Invests** | `investments.html` | Compound interest calculator with saved, comparable projections |
+| **Sarath Eats** | `food.html` | Food, protein and body-composition tracker (in progress, spec in `readme-food-tracker.md`) |
 
 ---
 
@@ -8,11 +14,13 @@ A cross-device gym workout tracker — one HTML file, Firebase backend, hosted f
 
 ```mermaid
 graph TD
-    A["Browser\n(index.html)"] -->|served from| B["GitHub Pages\nfree static hosting"]
+    A["Browser\n(index.html · investments.html · food.html)"] -->|served from| B["GitHub Pages\nfree static hosting"]
     A -->|Google Sign-In popup| C["Firebase Auth\nidentity & session"]
     A -->|read / write JSON| D["Firebase Firestore\ncloud database"]
     C -->|UID token validates| D
 ```
+
+No build step, no framework, no npm. Firebase compat SDK 10.12.2 is loaded from the gstatic CDN. Invests also loads Chart.js 4.4.1 from cdnjs.
 
 ---
 
@@ -20,22 +28,31 @@ graph TD
 
 ```
 users/                            ← collection
-  {uid}                           ← document per user (program stored here)
-    └── logs/                     ← subcollection
-          {YYYY-MM-DD}            ← one document per calendar day
+  {uid}                           ← user document (Lifts program lives here)
+    ├── state/
+    │     └── current             ← Lifts: persistent weights, seat pins, done flags
+    ├── logs/
+    │     └── {YYYY-MM-DD}        ← Lifts: legacy daily logs (read once for migration only)
+    ├── scenarios/
+    │     └── {autoId}            ← Invests: saved projections
+    ├── foodSettings/ foods/ meals/ foodLog/ bodyLog/
+    │                             ← Eats (see readme-food-tracker.md)
 ```
 
 All data is scoped to the authenticated user's UID. No shared state, no server.
 
 ---
 
-## Data model
+## Sarath Lifts (`index.html`)
+
+### Data model
 
 ```mermaid
 erDiagram
     USER {
         string uid PK
         array  program
+        int    programVersion
     }
     DAY {
         string day
@@ -50,33 +67,30 @@ erDiagram
         string cue
         bool   height
     }
-    LOG {
-        string date PK
-        string uid  FK
+    STATE {
+        string doc PK "always 'current'"
     }
-    LOG_ENTRY {
-        string exerciseIndex PK
+    STATE_ENTRY {
+        string dayIndex
+        string exerciseIndex
         string weight
-        string seatPin
+        string height
         bool   done
     }
 
-    USER      ||--o{ DAY       : "program[ ]"
-    DAY       ||--o{ EXERCISE  : "exercises[ ]"
-    USER      ||--o{ LOG       : "logs/{date}"
-    LOG       ||--o{ LOG_ENTRY : "{exerciseIndex}"
+    USER      ||--o{ DAY         : "program[ ]"
+    DAY       ||--o{ EXERCISE    : "exercises[ ]"
+    USER      ||--|| STATE       : "state/current"
+    STATE     ||--o{ STATE_ENTRY : "{dayIndex}.{exerciseIndex}"
 ```
-
----
-
-## Document shapes
 
 ### `users/{uid}` — the user document
 
-Stores the entire editable workout program as a single `program` field.
+Stores the entire editable workout program as a single `program` field, plus the version of the built-in default it was seeded from.
 
 ```json
 {
+  "programVersion": 3,
   "program": [
     {
       "day": "Day 1",
@@ -95,7 +109,7 @@ Stores the entire editable workout program as a single `program` field.
           "name": "Machine Chest Press",
           "sets": 4,
           "reps": "8-10",
-          "cue": "Primary chest driver; keep shoulders pinned back.",
+          "cue": "Best machine for chest hypertrophy; keep shoulders pinned back. Use safe low-displacement angle.",
           "height": true
         }
       ]
@@ -104,31 +118,38 @@ Stores the entire editable workout program as a single `program` field.
 }
 ```
 
-- Created automatically on first login, seeded with the default 3-day program.
-- Updated whenever the user saves changes from the **Edit Program** screen.
-- `height: true` means the exercise shows a Seat/pin input field.
+- Created automatically on first login, seeded from `DEFAULT_PROGRAM` in the source.
+- Updated whenever the user saves from the **Edit Program** screen (days are renumbered `Day 1…N` on save).
+- `height: true` means the exercise shows a Seat/pin input.
+- **`PROGRAM_VERSION`**: if the stored `programVersion` differs from the constant in the source, the program is replaced with `DEFAULT_PROGRAM` on next load. Bump it only when the default program text or structure changes, and note that it overwrites any edits made in the app.
 
----
+### `users/{uid}/state/current` — persistent progress
 
-### `users/{uid}/logs/{YYYY-MM-DD}` — daily log
-
-One document per calendar day. Keys are the **zero-based index** of the exercise in the day's flat `exercises` array. Warm-up exercises (block = `"Warm-up"`) are never logged.
+One document holding the latest weight, seat pin and done flag for every working exercise. It persists across days, so the last weight you used is always pre-filled. Keys are the **zero-based day index**, then the **zero-based exercise index** within that day's flat `exercises` array. Warm-ups (block `"Warm-up"`) have no inputs and are never stored.
 
 ```json
 {
-  "2": { "weight": "135", "height": "3",  "done": true  },
-  "3": { "weight": "90",  "height": "5",  "done": true  },
-  "4": { "weight": "70",  "height": "2",  "done": false },
-  "5": { "weight": "180", "height": "7",  "done": true  },
-  "6": { "weight": "45",  "height": "4",  "done": false }
+  "0": {
+    "2": { "weight": "135", "height": "3", "done": true  },
+    "3": { "weight": "90",  "height": "5", "done": false }
+  },
+  "1": {
+    "2": { "weight": "100", "height": "4", "done": false }
+  }
 }
 ```
 
-Key `"2"` → `program[dayIndex].exercises[2]` (the first working exercise in Day 1 after two warm-ups).
+Key `"0"."2"` → `program[0].exercises[2]` (the first working exercise in Day 1 after two warm-ups).
 
----
+- Written when you tap **Save progress**.
+- **Reset** clears only the `done` flags (after a styled confirm modal); weights and seat pins are kept.
+- Because entries are keyed by position, reordering or deleting exercises in the editor shifts which saved values line up with which exercise.
 
-## Auth & data flow
+### `users/{uid}/logs/{YYYY-MM-DD}` — legacy
+
+The original design wrote one document per calendar day. These are no longer written. On first load, if `state/current` is empty, all log documents are merged oldest → newest (latest weight wins), `done` flags are cleared, and the result is saved as `state/current`.
+
+### Auth & data flow
 
 ```mermaid
 sequenceDiagram
@@ -147,20 +168,54 @@ sequenceDiagram
     G-->>Auth:  token + profile
     Auth-->>App: user object (uid)
     App->>DB:   GET users/{uid}
-    DB-->>App:  program (or seeds default if first login)
-    App->>DB:   GET users/{uid}/logs/{today}
-    DB-->>App:  today's log entries
+    DB-->>App:  program (re-seeded if missing or version changed)
+    App->>DB:   GET users/{uid}/state/current
+    DB-->>App:  saved weights / pins / done (or migrate from logs/)
     App-->>U:   render workout tracker
 
     U->>App:  tap "Save progress"
-    App->>DB: SET users/{uid}/logs/{today}
+    App->>DB: SET users/{uid}/state/current
 ```
+
+---
+
+## Sarath Invests (`investments.html`)
+
+Compound interest calculator.
+
+- Inputs: initial investment, monthly contribution, years, annual rate, optional rate variance (±%), compound frequency (annual, semi-annual, quarterly, monthly, daily).
+- Contributions are added monthly; the compound frequency is converted to an effective monthly rate.
+- Results: final balance, total contributed, interest earned. With variance, pessimistic / base / optimistic cards and dashed lines on the chart (pessimistic rate is floored at 0%).
+- Chart.js stacked bar (contributions + interest per year) and a collapsible year-by-year table (every year up to 20, then every 5).
+- **Saved projections**: name and save, load to edit (Update or Save as New), double-click to rename, delete. Each row shows its final balance.
+- **Projection comparison**: appears once 2+ projections are saved; compares the checked ones side by side.
+
+### `users/{uid}/scenarios/{autoId}`
+
+```json
+{
+  "name": "Retirement Fund",
+  "principal": 10000,
+  "monthly": 500,
+  "years": 30,
+  "rate": 7,
+  "variance": 2,
+  "freq": 12,
+  "savedAt": "<server timestamp>"
+}
+```
+
+---
+
+## Sarath Eats (`food.html`)
+
+Food and body-composition tracker built to sit alongside the other two. The full build spec, data model and phases are in [`readme-food-tracker.md`](readme-food-tracker.md). Pure logic is tested with `node --test tests/`.
 
 ---
 
 ## Security rules
 
-Paste into **Firebase Console → Firestore → Rules**. Each user can only read and write their own data.
+Paste into **Firebase Console → Firestore → Rules**. Each user can only read and write their own data. The wildcard covers every subcollection used by all three apps (`state`, `logs`, `scenarios`, and the Eats collections).
 
 ```
 rules_version = '2';
@@ -169,12 +224,24 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
-    match /users/{uid}/logs/{logId} {
+    match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
   }
 }
 ```
+
+Also make sure your GitHub Pages domain and `localhost` are listed under **Firebase Console → Authentication → Settings → Authorized domains**.
+
+---
+
+## Running locally
+
+```
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/` (Lifts), `/investments.html` or `/food.html`.
 
 ---
 
@@ -186,4 +253,4 @@ service cloud.firestore {
 | Auth     | Firebase Auth (Google Sign-In)| Unlimited Google sign-ins                         | $0   |
 | Database | Firebase Firestore (Spark)    | 1 GB storage · 50k reads/day · 20k writes/day     | $0   |
 
-A typical workout session writes ~5–10 Firestore documents and reads ~2. The free tier is effectively unlimited for personal use.
+A workout session writes one document and reads two or three. A day of food logging writes one document per change burst (debounced). The free tier is effectively unlimited for personal use.
