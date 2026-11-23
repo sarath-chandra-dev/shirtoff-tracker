@@ -209,7 +209,7 @@ Compound interest calculator.
 
 ## Sarath Eats (`food.html`)
 
-Food and body-composition tracker built to sit alongside the other two. The full build spec, data model and phases are in [`readme-food-tracker.md`](readme-food-tracker.md). Pure logic is tested with `node --test tests/`.
+Food and body-composition tracker built to sit alongside the other two. The full build spec, data model and phases are in [`readme-food-tracker.md`](readme-food-tracker.md). Pure logic is tested with `node --test`.
 
 ---
 
